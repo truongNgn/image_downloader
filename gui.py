@@ -17,6 +17,7 @@ class ImageDownloaderApp:
         self.window.configure(bg="#FFFFFF")
         self.folder_path = tk.StringVar()
         self.image_name = tk.StringVar()  #Saving image custom name
+        self.image_format = tk.StringVar(value = 'png')
 
         self.canvas = Canvas(
             self.window,
@@ -36,8 +37,13 @@ class ImageDownloaderApp:
         self.canvas.create_text(34.0, 109.0, anchor="nw", text="Save Location", fill="#000000", font=("Inter", 12 * -1))
         self.canvas.create_text(34.0, 195.0, anchor="nw", text="Paste Image", fill="#000000", font=("Inter", 12 * -1))
 
-        self.ASSETS_PATH = Path(r"D:\Tool\Image-Location-Saver\Image-Location-Saver_ver_2.0\build\assets\frame0")
+        formats= ['png','jpg','jpeg', 'bmp' , 'gif' ]
+        self.format_dropdown = tk.OptionMenu(self.window, self.image_format,*formats)
+        self.format_dropdown.place(x=130.0, y=190.0, width = 80, height = 25.0)
 
+        self.ASSETS_PATH = Path(r"assets\frame0")
+        
+        
         self.entry_image_1 = PhotoImage(file=self.relative_to_assets("entry_1.png"))
         self.entry_bg_1 = self.canvas.create_image(188.0, 150.5, image=self.entry_image_1)
 
@@ -67,7 +73,7 @@ class ImageDownloaderApp:
             command=self.choose_folder,
             relief="flat"
         )
-        self.button_1.place(x=353.0, y=138.0, width=79.0, height=25.0)
+        self.button_1.place(x=353.0, y=140.0, width=79.0, height=25.0)
 
         self.button_image_2 = PhotoImage(file=self.relative_to_assets("button_2.png"))
         self.button_2 = Button(
@@ -77,7 +83,7 @@ class ImageDownloaderApp:
             command=self.download_image_from_url,
             relief="flat"
         )
-        self.button_2.place(x=158.0, y=216.0, width=156.0, height=25.0)
+        self.button_2.place(x=158.0, y=230.0, width=156.0, height=25.0)
 
         self.button_image_3 = PhotoImage(file=self.relative_to_assets("button_3.png"))
         self.button_3 = Button(
@@ -87,7 +93,7 @@ class ImageDownloaderApp:
             command=self.save_image_from_clipboard,
             relief="flat"
         )
-        self.button_3.place(x=158.0, y=258.0, width=151.0, height=25.0)
+        self.button_3.place(x=160.0, y=270.0, width=151.0, height=25.0)
 
         self.image_image_1 = PhotoImage(file=self.relative_to_assets("image_1.png"))
         self.image_1 = self.canvas.create_image(567.0, 193.0, image=self.image_image_1)
@@ -129,7 +135,7 @@ class ImageDownloaderApp:
             custom_name = self.image_name.get().strip()
             if not custom_name:
                 custom_name = "image"
-            ext = os.path.splitext(filename)[1] or ".jpg"
+            ext = f".{self.image_format.get()}"
             filename = f"{custom_name}_{self.get_timestamp()}{ext}"
 
             full_path = os.path.join(folder, filename)
@@ -151,7 +157,8 @@ class ImageDownloaderApp:
                 custom_name = self.image_name.get().strip()
                 if not custom_name:
                     custom_name = "image"
-                filename = f"{custom_name}_{self.get_timestamp()}.png"
+                ext = f".{self.image_format.get()}"
+                filename = f"{custom_name}_{self.get_timestamp()}{ext}"
                 full_path = os.path.join(folder, filename)
                 img.save(full_path)
                 messagebox.showinfo("Success", f"Clipboard image saved to:\n{full_path}")
