@@ -31,9 +31,16 @@
 
 ## 🚀 Getting Started
 
-### 1. Install required dependencies
+### Install required dependencies
 
 Use pip to install the dependencies:
 
 ```bash
 pip install -r requirements.txt
+
+```
+👤 Author
+Developed by [Truong Nguyen]
+
+Contact: truong.nhat3040@gmail.com
+
