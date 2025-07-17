@@ -20,6 +20,10 @@ class ImageDownloaderApp:
         self.image_name = tk.StringVar()  #Saving image custom name
         self.image_format = tk.StringVar(value = 'png')
 
+        self.auto_update = True
+
+        
+
         self.canvas = Canvas(
             self.window,
             bg="#FFFFFF",
@@ -86,24 +90,100 @@ class ImageDownloaderApp:
         )
         self.button_2.place(x=158.0, y=230.0, width=156.0, height=25.0)
 
-        # self.button_image_3 = PhotoImage(file=self.relative_to_assets("button_3.png"))
-        # self.button_3 = Button(
-        #     image=self.button_image_3,
-        #     borderwidth=0,
-        #     highlightthickness=0,
-        #     command=self.save_image_from_clipboard,
-        #     relief="flat"
-        # )
-        # self.button_3.place(x=160.0, y=270.0, width=151.0, height=25.0)
+        # Pause Auto-Update button
+        self.toggle_button = Button(
+            self.window,
+            text="Pause Auto-Update",
+            command=self.toggle_auto_update,
+            bg="#28a745",  # xanh lá
+            fg="white",
+            activebackground="#218838"
+        )
+        self.toggle_button.place(x=160, y=270.0, width=151, height=25)
+
+        
 
         self.image_image_1 = PhotoImage(file=self.relative_to_assets("image_1.png"))
         self.image_1 = self.canvas.create_image(570.0, 160.0, image=self.image_image_1)
 
+        
+
         self.canvas_displayed_image = None  # Avoid garbage collection
 
         self.load_clipboard_image_to_canvas()
+        self.last_clipboard_url = ""
+        self.last_clipboard_image = None
+        self.poll_clipboard()  # Check clipboard continuously
+
+        #Notify Download success or fail
+        self.status_label = tk.Label(
+            self.window,
+            text="Ready",
+            bg="#F4F4F4",
+            fg="black",
+            anchor="w",
+            font=("Inter", 10)
+        )
+        self.status_label.place(x=20, y=330, width=660, height=20)
 
         self.window.resizable(False, False)
+
+    #Update status Download
+    def update_status(self, message, success=True):
+        self.status_label.config(
+            text=message,
+            fg="green" if success else "red"
+        )
+    def toggle_auto_update(self):
+        self.auto_update = not self.auto_update
+        if self.auto_update:
+            self.toggle_button.config(
+                text="Pause Auto-Update",
+                bg="#28a745",  # xanh lá
+                activebackground="#218838"
+            )
+        else:
+            self.toggle_button.config(
+                text="Resume Auto-Update",
+                bg="#dc3545",  # đỏ
+                activebackground="#c82333"
+            )
+    
+    def poll_clipboard(self):
+        if self.auto_update:
+            current_url = pyperclip.paste()
+            if current_url.lower().startswith("http") and current_url != self.last_clipboard_url:
+                try:
+                    response = requests.get(current_url, timeout=5)
+                    response.raise_for_status()
+                    img = Image.open(BytesIO(response.content))
+                    self.update_canvas_image(img)
+                    self.last_clipboard_url = current_url
+                except Exception as e:
+                    print(f"[URL Check] Invalid or unreachable URL: {e}")
+
+            try:
+                img = ImageGrab.grabclipboard()
+                if isinstance(img, Image.Image) and not self.images_equal(img, self.last_clipboard_image):
+                    self.update_canvas_image(img)
+                    self.last_clipboard_image = img.copy()
+            except Exception as e:
+                print(f"[Clipboard Image Check] Error: {e}")
+
+        self.window.after(2000, self.poll_clipboard)
+
+
+    def images_equal(self, img1, img2):
+        if img1 is None or img2 is None:
+            return False
+        return list(img1.getdata()) == list(img2.getdata())
+    
+    def update_canvas_image(self, img):
+        img = img.copy()
+        img.thumbnail((200, 200))  # giữ tỉ lệ, tránh méo ảnh
+        self.canvas_displayed_image = ImageTk.PhotoImage(img)
+        self.canvas.itemconfig(self.image_1, image=self.canvas_displayed_image)
+
 
     def relative_to_assets(self, path: str) -> Path:
         return self.ASSETS_PATH / Path(path)
@@ -116,26 +196,26 @@ class ImageDownloaderApp:
     def download_image_auto(self):
         folder = self.folder_path.get()
         if not folder or not os.path.exists(folder):
-            messagebox.showerror("Error", "Please choose a valid folder to save the image.")
+            self.update_status("Please choose a valid folder to save the image.", success=False)
             return
 
-        # Lấy tên ảnh
+        # Get image name
         custom_name = self.image_name.get().strip() or "image"
         ext = f".{self.image_format.get()}"
         filename = f"{custom_name}_{self.get_timestamp()}{ext}"
         full_path = os.path.join(folder, filename)
 
         try:
-            # Ưu tiên: ảnh từ clipboard
+            # Try clipboard first
             img = ImageGrab.grabclipboard()
             if isinstance(img, Image.Image):
                 img.save(full_path)
-                messagebox.showinfo("Success", f"Clipboard image saved to:\n{full_path}")
+                self.update_status(f"Clipboard image saved to: {full_path}")
                 return
         except Exception as e:
-            print(f"Failed to grab image from clipboard: {e}")
+            print(f"Clipboard error: {e}")
 
-        # Nếu không có ảnh clipboard, thử từ URL
+        # Try URL
         url = pyperclip.paste()
         if url.lower().startswith("http"):
             try:
@@ -143,19 +223,17 @@ class ImageDownloaderApp:
                 response.raise_for_status()
                 img = Image.open(BytesIO(response.content))
                 img.save(full_path)
-                messagebox.showinfo("Success", f"Image downloaded from URL to:\n{full_path}")
+                self.update_status(f"Image downloaded from URL to: {full_path}")
                 return
             except Exception as e:
-                messagebox.showerror("Download Failed", f"Failed to load image from URL:\n{e}")
+                self.update_status(f"Failed to download from URL: {e}", success=False)
                 return
 
-        # Nếu không có cả hai
-        messagebox.showerror("Error", "No image found in clipboard or valid image URL in clipboard.")
+        self.update_status("No image in clipboard or valid image URL.", success=False)
+
 
     def load_clipboard_image_to_canvas(self):
         image = None
-
-        # Try loading from URL in clipboard
         url = pyperclip.paste()
         if url.lower().startswith("http"):
             try:
@@ -165,16 +243,14 @@ class ImageDownloaderApp:
             except Exception as e:
                 print(f"Failed to load image from URL: {e}")
 
-        # If not URL or failed, try loading image from clipboard
         if image is None:
             try:
                 image = ImageGrab.grabclipboard()
             except Exception as e:
                 print(f"Failed to grab image from clipboard: {e}")
 
-        # Display if valid
         if isinstance(image, Image.Image):
-            image = image.resize((200, 200))  # Optional: resize to fit canvas
+            image.thumbnail((200, 200), Image.Resampling.LANCZOS)
             self.canvas_displayed_image = ImageTk.PhotoImage(image)
             self.canvas.itemconfig(self.image_1, image=self.canvas_displayed_image)
         else:
@@ -182,9 +258,10 @@ class ImageDownloaderApp:
             
     def get_timestamp(self):
         return datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-
+    
+    
 
 if __name__ == "__main__":
-    root = tk.Tk()
+    root = TkinterDnD.Tk()  # Instead of tk.Tk()
     app = ImageDownloaderApp(root)
     root.mainloop()
