@@ -9,6 +9,7 @@ from PIL import Image, ImageTk, ImageGrab
 from io import BytesIO
 import datetime
 
+from tkinterdnd2 import DND_FILES, TkinterDnD
 
 class ImageDownloaderApp:
     def __init__(self, window):
@@ -23,7 +24,7 @@ class ImageDownloaderApp:
             self.window,
             bg="#FFFFFF",
             height=354,
-            width=702,
+            width=900,
             bd=0,
             highlightthickness=0,
             relief="ridge"
@@ -80,23 +81,23 @@ class ImageDownloaderApp:
             image=self.button_image_2,
             borderwidth=0,
             highlightthickness=0,
-            command=self.download_image_from_url,
+            command=self.download_image_auto,
             relief="flat"
         )
         self.button_2.place(x=158.0, y=230.0, width=156.0, height=25.0)
 
-        self.button_image_3 = PhotoImage(file=self.relative_to_assets("button_3.png"))
-        self.button_3 = Button(
-            image=self.button_image_3,
-            borderwidth=0,
-            highlightthickness=0,
-            command=self.save_image_from_clipboard,
-            relief="flat"
-        )
-        self.button_3.place(x=160.0, y=270.0, width=151.0, height=25.0)
+        # self.button_image_3 = PhotoImage(file=self.relative_to_assets("button_3.png"))
+        # self.button_3 = Button(
+        #     image=self.button_image_3,
+        #     borderwidth=0,
+        #     highlightthickness=0,
+        #     command=self.save_image_from_clipboard,
+        #     relief="flat"
+        # )
+        # self.button_3.place(x=160.0, y=270.0, width=151.0, height=25.0)
 
         self.image_image_1 = PhotoImage(file=self.relative_to_assets("image_1.png"))
-        self.image_1 = self.canvas.create_image(567.0, 193.0, image=self.image_image_1)
+        self.image_1 = self.canvas.create_image(570.0, 160.0, image=self.image_image_1)
 
         self.canvas_displayed_image = None  # Avoid garbage collection
 
@@ -112,60 +113,44 @@ class ImageDownloaderApp:
         if folder:
             self.folder_path.set(folder)
 
-    def download_image_from_url(self):
+    def download_image_auto(self):
         folder = self.folder_path.get()
         if not folder or not os.path.exists(folder):
             messagebox.showerror("Error", "Please choose a valid folder to save the image.")
             return
 
-        url = pyperclip.paste()
-        if not url.lower().startswith("http"):
-            messagebox.showerror("Error", "No valid image URL found in clipboard.")
-            return
+        # Lấy tên ảnh
+        custom_name = self.image_name.get().strip() or "image"
+        ext = f".{self.image_format.get()}"
+        filename = f"{custom_name}_{self.get_timestamp()}{ext}"
+        full_path = os.path.join(folder, filename)
 
         try:
-            response = requests.get(url)
-            response.raise_for_status()
-            img = Image.open(BytesIO(response.content))
-
-            parsed = urlparse(url)
-            filename = os.path.basename(parsed.path)
-            # if not filename or "." not in filename:
-            #     filename = f"image_{self.get_timestamp()}.jpg"
-            custom_name = self.image_name.get().strip()
-            if not custom_name:
-                custom_name = "image"
-            ext = f".{self.image_format.get()}"
-            filename = f"{custom_name}_{self.get_timestamp()}{ext}"
-
-            full_path = os.path.join(folder, filename)
-            img.save(full_path)
-            messagebox.showinfo("Success", f"Image downloaded to:\n{full_path}")
-        except Exception as e:
-            messagebox.showerror("Download Failed", str(e))
-
-    def save_image_from_clipboard(self):
-        folder = self.folder_path.get()
-        if not folder or not os.path.exists(folder):
-            messagebox.showerror("Error", "Please choose a valid folder to save the image.")
-            return
-
-        try:
+            # Ưu tiên: ảnh từ clipboard
             img = ImageGrab.grabclipboard()
             if isinstance(img, Image.Image):
-                # filename = f"clipboard_image_{self.get_timestamp()}.png"
-                custom_name = self.image_name.get().strip()
-                if not custom_name:
-                    custom_name = "image"
-                ext = f".{self.image_format.get()}"
-                filename = f"{custom_name}_{self.get_timestamp()}{ext}"
-                full_path = os.path.join(folder, filename)
                 img.save(full_path)
                 messagebox.showinfo("Success", f"Clipboard image saved to:\n{full_path}")
-            else:
-                messagebox.showerror("Error", "No image found in clipboard.")
+                return
         except Exception as e:
-            messagebox.showerror("Paste Failed", str(e))
+            print(f"Failed to grab image from clipboard: {e}")
+
+        # Nếu không có ảnh clipboard, thử từ URL
+        url = pyperclip.paste()
+        if url.lower().startswith("http"):
+            try:
+                response = requests.get(url)
+                response.raise_for_status()
+                img = Image.open(BytesIO(response.content))
+                img.save(full_path)
+                messagebox.showinfo("Success", f"Image downloaded from URL to:\n{full_path}")
+                return
+            except Exception as e:
+                messagebox.showerror("Download Failed", f"Failed to load image from URL:\n{e}")
+                return
+
+        # Nếu không có cả hai
+        messagebox.showerror("Error", "No image found in clipboard or valid image URL in clipboard.")
 
     def load_clipboard_image_to_canvas(self):
         image = None
